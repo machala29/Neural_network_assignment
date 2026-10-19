@@ -9,6 +9,8 @@ class Tensor:  ## begins the definition of the Tensor class, which is a fundamen
         self._backward = lambda: None ## it's a one line nameless function that takes no input and retunrs nothing. This is a placeholder for the backward method that will be defined later. It will be used to compute the gradients of the tensor with respect to its parents during backpropagation.
         self.op = op ## stores the lablel of the operation that produced this tensor. This is used for debugging and visualization purposes.            
 
+    
+    
     def __add__(self, other): ## runs for a + b where a is self and b is other. It defines the addition operation for tensors.
         other = other if isinstance(other, Tensor) else Tensor(other) ## checks if other is already a Tensor. If not, it converts it into a Tensor. This allows for operations between Tensors and scalars or other data types.
         out = Tensor(self.data + other.data, parents=(self, other), op="+") ## does the forward pass of the addition operation. It creates a new Tensor out that holds the result of adding self.data and other.data. It also sets the parents of out to be self and other, and labels the operation as "+".
@@ -22,6 +24,7 @@ class Tensor:  ## begins the definition of the Tensor class, which is a fundamen
         return out  ## gives back the result of the addition operation as a new Tensor. This allows for chaining operations together, as the result can be used in further computations.    
 
 
+    
     def __mul__(self, other): ## runs for a * b where a is self and b is other. It defines the multiplication operation for tensors.
         other = other if isinstance(other, Tensor) else Tensor(other) ## checks if other is already a Tensor. If not, it converts it into a Tensor. This allows for operations between Tensors and scalars or other data types.
         out = Tensor(self.data * other.data, parents=(self, other), op="*") ## does the forward pass of the multiplication operation. It creates a new Tensor out that holds the result of multiplying self.data and other.data. It also sets the parents of out to be self and other, and labels the operation as "*".
@@ -33,6 +36,57 @@ class Tensor:  ## begins the definition of the Tensor class, which is a fundamen
         out._backward = _backward ## attach the _backward function to the out tensor. This allows the backward pass to be executed when backpropagation is performed on out.
         return out  ## gives back the result of the multiplication operation as a new Tensor. This allows for chaining operations together, as the result can be used in further computations.
 
+
+    def __neg__(self): ## defines the negation operation for tensors. It allows for expressions like -a, where a is a Tensor.
+        out = Tensor(-self.data, parents=(self,), op="neg") ## does the forward pass of the negation operation. It creates a new Tensor out that holds the result of negating self.data. It also sets the parent of out to be self, and labels the operation as "neg".
+
+        def _backward(): ## it captures the results of self and out from the outer scope. It defines the backward pass for the negation operation. This function will be called during backpropagation to compute the gradient of self with respect to out.
+            self.grad -= out.grad ## updates the gradient of self by subtracting out.grad. This is based on the chain rule of calculus, which states that the gradient of a function with respect to its inputs is the product of the gradients along the computational graph.
+
+        out._backward = _backward ## attach the _backward function to the out tensor. This allows the backward pass to be executed when backpropagation is performed on out.
+        return out  ## gives back the result of the negation operation as a new Tensor. This allows for chaining operations together, as the result can be used in further computations.    
+
+
+    def __sub__(self, other): ## defines the subtraction operation for tensors. It allows for expressions like a - b, where a and b are Tensors.                
+        other = other if isinstance(other, Tensor) else Tensor(other) ## checks if other is already a Tensor. If not, it converts it into a Tensor. This allows for operations between Tensors and scalars or other data types.
+        out = Tensor(self.data - other.data, parents=(self, other), op="-") ## does the forward pass of the subtraction operation. It creates a new Tensor out that holds the result of subtracting other.data from self.data. It also sets the parents of out to be self and other, and labels the operation as "-".
+
+        def _backward(): ## it captures the results of self, other and out from the outer scope. It defines the backward pass for the subtraction operation. This function will be called during backpropagation to compute the gradients of self and other with respect to out.
+            self.grad += out.grad ## updates the gradient of self by adding out.grad. This is based on the chain rule of calculus, which states that the gradient of a function with respect to its inputs is the product of the gradients along the computational graph.
+            other.grad -= out.grad ## updates the gradient of other by subtracting out.grad. This is also based on the chain rule of calculus.
+
+        out._backward = _backward ## attach the _backward function to the out tensor. This allows the backward pass to be executed when backpropagation is performed on out.
+        return out  ## gives back the result of the subtraction operation as a new Tensor. This allows for chaining operations together, as the result can be used in further computations.
+
+
+    def __truediv__(self, other): ## defines the division operation for tensors. It allows for expressions like a / b, where a and b are Tensors.                       
+        other = other if isinstance(other, Tensor) else Tensor(other) ## checks if other is already a Tensor. If not, it converts it into a Tensor. This allows for operations between Tensors and scalars or other data types.
+        out = Tensor(self.data / other.data, parents=(self, other), op="/") ## does the forward pass of the division operation. It creates a new Tensor out that holds the result of dividing self.data by other.data. It also sets the parents of out to be self and other, and labels the operation as "/".
+
+        def _backward(): ## it captures the results of self, other and out from the outer scope. It defines the backward pass for the division operation. This function will be called during backpropagation to compute the gradients of self and other with respect to out.
+            self.grad += (1 / other.data) * out.grad ## updates the gradient of self by adding the product of (1 / other.data) and out.grad. This is based on the chain rule of calculus, which states that the gradient of a function with respect to its inputs is the product of the gradients along the computational graph.
+            other.grad -= (self.data / (other.data ** 2)) * out.grad ## updates the gradient of other by subtracting the product of (self.data / (other.data ** 2)) and out.grad. This is also based on the chain rule of calculus.
+
+        out._backward = _backward ## attach the _backward function to the out tensor. This allows the backward pass to be executed when backpropagation is performed on out.
+        return out  ## gives back the result of the division operation as a new Tensor. This allows for chaining operations together, as the result can be used in further computations.    
+
+
+
+
+    def __pow__(self, power): ## defines the power operation for tensors. It allows for expressions like a ** b, where a is a Tensor and b is a scalar or another Tensor.
+        assert isinstance(power, (int, float)), "Power must be an int or float" ## checks if the power is either an integer or a float. If not, it raises an assertion error with the message "Power must be an int or float". This ensures that the power operation is only performed with valid types.
+
+        out = Tensor(self.data ** power, parents=(self,), op=f"**{power}") ## does the forward pass of the power operation. It creates a new Tensor out that holds the result of raising self.data to the specified power. It also sets the parent of out to be self, and labels the operation as "**{power}".
+
+        def _backward(): ## it captures the results of self, power and out from the outer scope. It defines the backward pass for the power operation. This function will be called during backpropagation to compute the gradient of self with respect to out.
+            self.grad += (power * (self.data ** (power - 1))) * out.grad ## updates the gradient of self by adding the product of (power * (self.data ** (power - 1))) and out.grad. This is based on the chain rule of calculus, which states that the gradient of a function with respect to its inputs is the product of the gradients along the computational graph.
+
+        out._backward = _backward ## attach the _backward function to the out tensor. This allows the backward pass to be executed when backpropagation is performed on out.
+        return out  ## gives back the result of the power operation as a new Tensor. This allows for chaining operations together, as the result can be used in further computations.   
+
+
+
+    
 
 
     def backward(self): ## defines the backward method for the Tensor class.
@@ -52,3 +106,18 @@ class Tensor:  ## begins the definition of the Tensor class, which is a fundamen
 
         for tensor in reversed(topo): ## iterates over each tensor in topo in reverse order. This ensures that we process tensors from leaves to roots, allowing gradients to flow correctly through the computational graph.
             tensor._backward() ## calls the _backward method of each tensor, which computes and accumulates gradients for its parents based on its own gradient. This effectively propagates gradients backward through the computational graph.
+
+
+        
+    def __radd__(self, other):
+        return self + other  ## allows for right-side addition, enabling expressions like scalar + Tensor to work correctly by delegating to the __add__ method.
+
+    def __rmul__(self, other):
+        return self * other  ## allows for right-side multiplication, enabling expressions like scalar * Tensor to work correctly by delegating to the __mul__ method.  
+
+    def __rsub__(self, other):
+        return -self + other  ## allows for right-side subtraction, enabling expressions like scalar - Tensor to work correctly by negating self and adding it to other. This effectively computes the difference between other and self.
+
+
+    def __rtruediv__(self, other):
+        return Tensor(other) / self  ## allows for right-side division, enabling expressions like scalar / Tensor to work correctly by creating a new Tensor from other and dividing it by self. This effectively computes the reciprocal of self multiplied by other.
