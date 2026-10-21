@@ -1,6 +1,20 @@
 import numpy as np
 # loads numpy as np. All array work uses it.
 
+
+def unbroadcast(grad, shape):
+    while grad.ndim > len(shape):
+        grad = grad.sum(axis=0)  ## remove leading axis
+    for axis, size in enumerate(shape):
+        if size == 1 and grad.shape[axis] > 1:
+            grad = grad.sum(axis=axis, keepdims=True)  ## sum along the axis
+    return grad
+
+
+
+
+
+
 class Tensor:  ## begins the definition of the Tensor class, which is a fundamental data structure for automatic differentiation. i.e the blueprint
     def __init__(self, data, parents=(), op=""):    ## set-up method. If parents=() is not passed. It's defaaults to an empty tuple. This means that the tensor has no parents in the computational graph. The op parameter is a string that describes the operation that produced this tensor. 
         self.data =np.asarray(data, dtype=np.float64) ## passes all data to an array of 64-bit decimals
@@ -16,8 +30,8 @@ class Tensor:  ## begins the definition of the Tensor class, which is a fundamen
         out = Tensor(self.data + other.data, parents=(self, other), op="+") ## does the forward pass of the addition operation. It creates a new Tensor out that holds the result of adding self.data and other.data. It also sets the parents of out to be self and other, and labels the operation as "+".
 
         def _backward(): ## it captures the results of self, other and out from the outer scope. It defines the backward pass for the addition operation. This function will be called during backpropagation to compute the gradients of self and other with respect to out.
-            self.grad += out.grad ## updates the gradient of self by adding the gradient of out. This is based on the chain rule of calculus, which states that the gradient of a function with respect to its inputs is the product of the gradients along the computational graph.
-            other.grad += out.grad ## updates the gradient of other by adding the gradient of out. This is also based on the chain rule of calculus.
+            self.grad += unbroadcast(out.grad, self.data.shape) ## updates the gradient of self by adding the gradient of out. This is based on the chain rule of calculus, which states that the gradient of a function with respect to its inputs is the product of the gradients along the computational graph.
+            other.grad += unbroadcast(out.grad, other.data.shape) ## updates the gradient of other by adding the gradient of out. This is also based on the chain rule of calculus.
 
 
         out._backward = _backward ## attach the _backward function to the out tensor. This allows the backward pass to be executed when backpropagation is performed on out.
@@ -30,8 +44,8 @@ class Tensor:  ## begins the definition of the Tensor class, which is a fundamen
         out = Tensor(self.data * other.data, parents=(self, other), op="*") ## does the forward pass of the multiplication operation. It creates a new Tensor out that holds the result of multiplying self.data and other.data. It also sets the parents of out to be self and other, and labels the operation as "*".
 
         def _backward(): ## it captures the results of self, other and out from the outer scope. It defines the backward pass for the multiplication operation. This function will be called during backpropagation to compute the gradients of self and other with respect to out.
-            self.grad += other.data * out.grad ## updates the gradient of self by adding the product of other.data and out.grad. This is based on the chain rule of calculus, which states that the gradient of a function with respect to its inputs is the product of the gradients along the computational graph.
-            other.grad += self.data * out.grad ## updates the gradient of other by adding the product of self.data and out.grad. This is also based on the chain rule of calculus.
+            self.grad += unbroadcast((other.data * out.grad), self.data.shape) ## updates the gradient of self by adding the product of other.data and out.grad. This is based on the chain rule of calculus, which states that the gradient of a function with respect to its inputs is the product of the gradients along the computational graph.
+            other.grad += unbroadcast((self.data * out.grad), other.data.shape) ## updates the gradient of other by adding the product of self.data and out.grad. This is also based on the chain rule of calculus.
 
         out._backward = _backward ## attach the _backward function to the out tensor. This allows the backward pass to be executed when backpropagation is performed on out.
         return out  ## gives back the result of the multiplication operation as a new Tensor. This allows for chaining operations together, as the result can be used in further computations.
@@ -52,8 +66,8 @@ class Tensor:  ## begins the definition of the Tensor class, which is a fundamen
         out = Tensor(self.data - other.data, parents=(self, other), op="-") ## does the forward pass of the subtraction operation. It creates a new Tensor out that holds the result of subtracting other.data from self.data. It also sets the parents of out to be self and other, and labels the operation as "-".
 
         def _backward(): ## it captures the results of self, other and out from the outer scope. It defines the backward pass for the subtraction operation. This function will be called during backpropagation to compute the gradients of self and other with respect to out.
-            self.grad += out.grad ## updates the gradient of self by adding out.grad. This is based on the chain rule of calculus, which states that the gradient of a function with respect to its inputs is the product of the gradients along the computational graph.
-            other.grad -= out.grad ## updates the gradient of other by subtracting out.grad. This is also based on the chain rule of calculus.
+            self.grad += unbroadcast(out.grad, self.data.shape) ## updates the gradient of self by adding out.grad. This is based on the chain rule of calculus, which states that the gradient of a function with respect to its inputs is the product of the gradients along the computational graph.
+            other.grad -= unbroadcast(out.grad, other.data.shape) ## updates the gradient of other by subtracting out.grad. This is also based on the chain rule of calculus.
 
         out._backward = _backward ## attach the _backward function to the out tensor. This allows the backward pass to be executed when backpropagation is performed on out.
         return out  ## gives back the result of the subtraction operation as a new Tensor. This allows for chaining operations together, as the result can be used in further computations.
@@ -64,8 +78,8 @@ class Tensor:  ## begins the definition of the Tensor class, which is a fundamen
         out = Tensor(self.data / other.data, parents=(self, other), op="/") ## does the forward pass of the division operation. It creates a new Tensor out that holds the result of dividing self.data by other.data. It also sets the parents of out to be self and other, and labels the operation as "/".
 
         def _backward(): ## it captures the results of self, other and out from the outer scope. It defines the backward pass for the division operation. This function will be called during backpropagation to compute the gradients of self and other with respect to out.
-            self.grad += (1 / other.data) * out.grad ## updates the gradient of self by adding the product of (1 / other.data) and out.grad. This is based on the chain rule of calculus, which states that the gradient of a function with respect to its inputs is the product of the gradients along the computational graph.
-            other.grad -= (self.data / (other.data ** 2)) * out.grad ## updates the gradient of other by subtracting the product of (self.data / (other.data ** 2)) and out.grad. This is also based on the chain rule of calculus.
+            self.grad += (1 / other.data) * unbroadcast(out.grad, self.data.shape) ## updates the gradient of self by adding the product of (1 / other.data) and out.grad. This is based on the chain rule of calculus, which states that the gradient of a function with respect to its inputs is the product of the gradients along the computational graph.
+            other.grad -= (self.data / (other.data ** 2)) * unbroadcast(out.grad, other.data.shape) ## updates the gradient of other by subtracting the product of (self.data / (other.data ** 2)) and out.grad. This is also based on the chain rule of calculus.
 
         out._backward = _backward ## attach the _backward function to the out tensor. This allows the backward pass to be executed when backpropagation is performed on out.
         return out  ## gives back the result of the division operation as a new Tensor. This allows for chaining operations together, as the result can be used in further computations.    

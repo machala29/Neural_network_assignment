@@ -1,4 +1,6 @@
+import numpy as np
 from nnlib.autograd import Tensor
+
 
 def test_mul_and_add():
     a = Tensor(3.0)
@@ -45,6 +47,7 @@ def test_neg():
     a.grad == -1.0
 
 
+
 def test_sub():
     a = Tensor(3.0)
     b = Tensor(1.0)
@@ -52,3 +55,45 @@ def test_sub():
     L.backward()
     a.grad == 1.0
     b.grad == -1.0
+
+def test_div():
+    a = Tensor(3.0)
+    b = Tensor(4.0)
+    L = a / b
+    L.backward()
+    a.grad == 0.25
+    b.grad == -0.1875
+
+
+
+
+
+def test_bias_add_broadcast():
+    x = Tensor([[1., 2.], [3., 4.], [5., 6.]])   # shape (3, 2)
+    b = Tensor([[10., 20.]])                      # shape (1, 2)
+    out = x + b
+    assert out.data.shape == (3, 2)               # forward result has the big shape
+    out.backward()
+    assert b.grad.shape == (1, 2)                 # gradient shape matches b
+    assert np.allclose(b.grad, [[3., 3.]])        # 3 rows were summed
+    assert np.allclose(x.grad, np.ones((3, 2)))
+
+
+def test_vector_bias_broadcast():
+    x = Tensor([[1., 2.], [3., 4.], [5., 6.]])
+    b = Tensor([10., 20.])
+    out = x + b 
+    assert out.data.shape == (3, 2)
+    out.backward()
+    assert b.grad.shape == (2,)
+    assert np.allclose(x.grad, np.ones((3, 2)))
+
+
+def test_multiply_broadcast():
+    x = Tensor([[1., 2.], [3., 4.], [5., 6.]])
+    w = Tensor([[10., 20.]])
+    out = x * w
+    assert out.data.shape == (3, 2)
+    out.backward()
+    assert np.allclose(w.grad, [9., 12.])
+    assert np.allclose(x.grad, [[10, 20], [10, 20], [10, 20]])
