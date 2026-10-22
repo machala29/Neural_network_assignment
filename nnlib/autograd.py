@@ -14,7 +14,6 @@ def unbroadcast(grad, shape):
 
 
 
-
 class Tensor:  ## begins the definition of the Tensor class, which is a fundamental data structure for automatic differentiation. i.e the blueprint
     def __init__(self, data, parents=(), op=""):    ## set-up method. If parents=() is not passed. It's defaaults to an empty tuple. This means that the tensor has no parents in the computational graph. The op parameter is a string that describes the operation that produced this tensor. 
         self.data =np.asarray(data, dtype=np.float64) ## passes all data to an array of 64-bit decimals
@@ -135,3 +134,16 @@ class Tensor:  ## begins the definition of the Tensor class, which is a fundamen
 
     def __rtruediv__(self, other):
         return Tensor(other) / self  ## allows for right-side division, enabling expressions like scalar / Tensor to work correctly by creating a new Tensor from other and dividing it by self. This effectively computes the reciprocal of self multiplied by other.
+
+
+
+    def __matmul__(self, other): ## defines the matrix multiplication operation for tensors. It allows for expressions like a @ b, where a and b are Tensors.
+        other = other if isinstance(other, Tensor) else Tensor(other) ## checks if other is already a Tensor. If not, it converts it into a Tensor. This allows for operations between Tensors and scalars or other data types.
+        out = Tensor(self.data @ other.data, parents=(self, other), op="@") ## does the forward pass of the matrix multiplication operation. It creates a new Tensor out that holds the result of multiplying self.data and other.data using the @ operator. It also sets the parents of out to be self and other, and labels the operation as "@".
+
+        def _backward(): ## it captures the results of self, other and out from the outer scope. It defines the backward pass for the matrix multiplication operation. This function will be called during backpropagation to compute the gradients of self and other with respect to out.
+            self.grad += out.grad @ other.data.T ## updates the gradient of self by adding the product of out.grad and the transpose of other.data. This is based on the chain rule of calculus, which states that the gradient of a function with respect to its inputs is the product of the gradients along the computational graph.
+            other.grad += self.data.T @ out.grad ## updates the gradient of other by adding the product of the transpose of self.data and out.grad. This is also based on the chain rule of calculus.
+
+        out._backward = _backward ## attach the _backward function to the out tensor. This allows the backward pass to be executed when backpropagation is performed on out.
+        return out  ## gives back the result of the matrix multiplication operation as a new Tensor. This allows for chaining operations together, as the result can be used in further computations.

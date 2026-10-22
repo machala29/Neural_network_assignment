@@ -44,7 +44,7 @@ def test_neg():
     a = Tensor(3.0)
     L = -a
     L.backward()
-    a.grad == -1.0
+    assert a.grad == -1.0
 
 
 
@@ -53,8 +53,8 @@ def test_sub():
     b = Tensor(1.0)
     L = a - b 
     L.backward()
-    a.grad == 1.0
-    b.grad == -1.0
+    assert a.grad == 1.0
+    assert b.grad == -1.0
 
 def test_div():
     a = Tensor(3.0)
@@ -97,3 +97,29 @@ def test_multiply_broadcast():
     out.backward()
     assert np.allclose(w.grad, [9., 12.])
     assert np.allclose(x.grad, [[10, 20], [10, 20], [10, 20]])
+
+
+def test_matmul():
+    a = Tensor([[1., 2.], [3., 4.], [5., 6.]])
+    b = Tensor([[1., 2.], [3., 4.]])
+    out = a @ b
+    assert out.data.shape == (3, 2)
+    assert np.allclose(out.data, [[7., 10.], [15., 22.], [23., 34.]])
+    out.backward()
+    assert a.grad.shape == (3, 2)
+    assert b.grad.shape == (2, 2)
+    assert np.allclose(a.grad, [[3., 7.], [3., 7.], [3., 7.]])
+    assert np.allclose(b.grad, [[9., 9.], [12., 12.]])
+
+
+def test_matmul_non_square():
+    a = Tensor([[1., 2.], [3., 4.], [5., 6.]])
+    b = Tensor([[1.], [2.]])
+    out = a @ b
+    assert out.data.shape == (3, 1)
+    assert np.allclose(out.data, [[5.], [11.], [17.]])
+    out.backward()
+    assert a.grad.shape == (3, 2)
+    assert b.grad.shape == (2, 1)
+    assert np.allclose(a.grad, [[1., 2.], [1., 2.], [1., 2.]])
+    assert np.allclose(b.grad, [[9.], [12.]])
