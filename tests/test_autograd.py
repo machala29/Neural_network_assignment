@@ -123,3 +123,58 @@ def test_matmul_non_square():
     assert b.grad.shape == (2, 1)
     assert np.allclose(a.grad, [[1., 2.], [1., 2.], [1., 2.]])
     assert np.allclose(b.grad, [[9.], [12.]])
+
+def test_sum_axis1():
+    a = Tensor([[1., 2.], [3., 4.], [5., 6.]])
+    w = Tensor([1., 2., 3.])
+    out = a.sum(axis=1)
+    assert out.data.shape == (3,)
+    L = (out * w).sum()
+    assert np.isclose(L.data, 50.0)
+    L.backward()
+    assert a.grad.shape == (3, 2)
+    assert np.allclose(a.grad, [[1., 1.], [2., 2.], [3., 3.]])
+    
+
+def test_exp():
+    a = Tensor(1.0)
+    out = a.exp()
+    assert np.isclose(out.data, np.e)
+    out.backward()
+    assert np.isclose(a.grad, np.e)
+
+def test_log():
+    a = Tensor(2.0)
+    out = a.log()
+    assert np.isclose(out.data, np.log(2.0))
+    out.backward()
+    assert np.isclose(a.grad, 1.0 / 2.0)
+
+def test_relu():
+    a = Tensor([-2.0, -1.0, 0.0, 1.0, 2.0])
+    out = a.relu()
+    assert np.allclose(out.data, [0.0, 0.0, 0.0, 1.0, 2.0])
+    out.backward()
+    assert np.allclose(a.grad, [0.0, 0.0, 0.0, 1.0, 1.0])
+
+def test_tanh():
+    a = Tensor(0.5)
+    out = a.tanh()
+    assert np.isclose(out.data, np.tanh(0.5))
+    out.backward()
+    assert np.isclose(a.grad, 1.0 - np.tanh(0.5) ** 2)
+
+def test_sigmoid():
+    a = Tensor(1.0)
+    out = a.sigmoid()   
+    assert np.isclose(out.data, 1.0 / (1.0 + np.exp(-1.0)))
+    out.backward()
+    assert np.isclose(a.grad, out.data * (1.0 - out.data))  
+
+def test_exp_log():
+    a = Tensor(0.7)
+    L = a.exp().log()
+    L.backward()
+    assert np.isclose(a.grad, 1.0)  # The gradient of log(exp(a)) with respect to a is 1.0, since log(exp(a)) = a.
+
+ 

@@ -147,3 +147,98 @@ class Tensor:  ## begins the definition of the Tensor class, which is a fundamen
 
         out._backward = _backward ## attach the _backward function to the out tensor. This allows the backward pass to be executed when backpropagation is performed on out.
         return out  ## gives back the result of the matrix multiplication operation as a new Tensor. This allows for chaining operations together, as the result can be used in further computations.
+
+    
+
+    def transpose(self): ## defines the transpose operation for tensors. It allows for expressions like a.transpose(), where a is a Tensor.
+        out = Tensor(self.data.T, parents=(self,), op="transpose") ## does the forward pass of the transpose operation. It creates a new Tensor out that holds the result of transposing self.data. It also sets the parent of out to be self, and labels the operation as "transpose".
+
+        def _backward(): ## it captures the results of self and out from the outer scope. It defines the backward pass for the transpose operation. This function will be called during backpropagation to compute the gradient of self with respect to out.
+            self.grad += out.grad.T ## updates the gradient of self by adding the transpose of out.grad. This is based on the chain rule of calculus, which states that the gradient of a function with respect to its inputs is the product of the gradients along the computational graph.
+
+        out._backward = _backward ## attach the _backward function to the out tensor. This allows the backward pass to be executed when backpropagation is performed on out.
+        return out  ## gives back the result of the transpose operation as a new Tensor. This allows for chaining operations together, as the result can be used in further computations.   
+
+    @property
+    def T(self): ## defines a property T that allows for accessing the transpose of a tensor    
+        return self.transpose() ## returns the result of calling the transpose method on self. This allows for expressions like a.T to get the transpose of a tensor a. 
+
+
+
+    def reshape(self, shape): ## defines the reshape operation for tensors. It allows for expressions like a.reshape(new_shape), where a is a Tensor and new_shape is a tuple specifying the desired shape.
+        out = Tensor(self.data.reshape(shape), parents=(self,), op="reshape") ## does the forward pass of the reshape operation. It creates a new Tensor out that holds the result of reshaping self.data to new_shape. It also sets the parent of out to be self, and labels the operation as "reshape".
+
+        def _backward(): ## it captures the results of self and out from the outer scope. It defines the backward pass for the reshape operation. This function will be called during backpropagation to compute the gradient of self with respect to out.
+            self.grad += out.grad.reshape(self.data.shape) ## updates the gradient of self by adding out.grad reshaped back to the original shape of self.data. This is based on the chain rule of calculus, which states that the gradient of a function with respect to its inputs is the product of the gradients along the computational graph.
+
+        out._backward = _backward ## attach the _backward function to the out tensor. This allows the backward pass to be executed when backpropagation is performed on out.
+        return out  ## gives back the result of the reshape operation as a new Tensor. This allows for chaining operations together, as the result can be used in further computations.
+
+    def sum(self, axis=None, keepdims=False): ## defines the sum operation for tensors. It allows for expressions like a.sum(axis=0), where a is a Tensor and axis specifies the dimension along which to sum.
+        out = Tensor(self.data.sum(axis=axis, keepdims=keepdims), parents=(self,), op="sum") ## does the forward pass of the sum operation. It creates a new Tensor out that holds the result of summing self.data along the specified axis. It also sets the parent of out to be self, and labels the operation as "sum".
+
+        def _backward(): ## it captures the results of self and out from the outer scope. It defines the backward pass for the sum operation. This function will be called during backpropagation to compute the gradient of self with respect to out.
+            g = out.grad ## stores the gradient of out in a variable grad.
+            if axis is not None and not keepdims: ## checks if keepdims is False.
+                g = np.expand_dims(g, axis=axis) ## if keepdims is False, it expands the dimensions of grad along the specified axis to match the shape of self.data.
+            self.grad += np.broadcast_to(g, self.data.shape) ## updates the gradient of self by adding grad broadcasted to match the shape of self.data. This is based on the chain rule of calculus, which states that the gradient of a function with respect to its inputs is the product of the gradients along the computational graph.
+
+        out._backward = _backward ## attach the _backward function to the out tensor. This allows the backward pass to be executed when backpropagation is performed on out.
+        return out  ## gives back the result of the sum operation as a new Tensor. This allows for chaining operations together, as the result can be used in further computations.
+
+
+    def mean(self, axis=None, keepdims=False):
+        n = self.data.size if axis is None else self.data.shape[axis] ## calculates the number of elements along the specified axis. If axis is None, it uses the total number of elements in self.data.
+        return self.sum(axis=axis, keepdims=keepdims) * (1.0    / n) ## returns the mean of self.data by dividing the sum by the number of elements. It calls the sum method and scales the result by 1/n. This allows for expressions like a.mean(axis=0) to compute the mean along a specified axis.  
+
+
+    def exp(self): ## defines the exponential operation for tensors. It allows for expressions like a.exp(), where a is a Tensor.
+        out = Tensor(np.exp(self.data), parents=(self,), op="exp") ## does the forward pass of the exponential operation. It creates a new Tensor out that holds the result of applying the exponential function to self.data. It also sets the parent of out to be self, and labels the operation as "exp".
+
+        def _backward(): ## it captures the results of self and out from the outer scope. It defines the backward pass for the exponential operation. This function will be called during backpropagation to compute the gradient of self with respect to out.
+            self.grad += out.data * out.grad ## updates the gradient of self by adding the product of out.data and out.grad. This is based on the chain rule of calculus, which states that the gradient of a function with respect to its inputs is the product of the gradients along the computational graph.
+
+        out._backward = _backward ## attach the _backward function to the out tensor. This allows the backward pass to be executed when backpropagation is performed on out.
+        return out  ## gives back the result of the exponential operation as a new Tensor. This allows for chaining operations together, as the result can be used in further computations. 
+
+
+    def log(self): ## defines the natural logarithm operation for tensors. It allows for expressions like a.log(), where a is a Tensor.
+        out = Tensor(np.log(self.data), parents=(self,), op="log") ## does the forward pass of the logarithm operation. It creates a new Tensor out that holds the result of applying the natural logarithm function to self.data. It also sets the parent of out to be self, and labels the operation as "log".
+
+        def _backward(): ## it captures the results of self and out from the outer scope. It defines the backward pass for the logarithm operation. This function will be called during backpropagation to compute the gradient of self with respect to out.
+            self.grad += (1 / self.data) * out.grad ## updates the gradient of self by adding the product of (1 / self.data) and out.grad. This is based on the chain rule of calculus, which states that the gradient of a function with respect to its inputs is the product of the gradients along the computational graph.
+
+        out._backward = _backward ## attach the _backward function to the out tensor. This allows the backward pass to be executed when backpropagation is performed on out.
+        return out  ## gives back the result of the logarithm operation as a new Tensor. This allows for chaining operations together, as the result can be used in further computations.   
+
+
+    def relu(self): ## defines the ReLU (Rectified Linear Unit) activation function for tensors. It allows for expressions like a.relu(), where a is a Tensor.
+        out = Tensor(np.maximum(0, self.data), parents=(self,), op="ReLU") ## does the forward pass of the ReLU operation. It creates a new Tensor out that holds the result of applying the ReLU function to self.data. It also sets the parent of out to be self, and labels the operation as "ReLU".
+
+        def _backward(): ## it captures the results of self and out from the outer scope. It defines the backward pass for the ReLU operation. This function will be called during backpropagation to compute the gradient of self with respect to out.
+            self.grad += (self.data > 0) * out.grad ## updates the gradient of self by adding the product of (self.data > 0) and out.grad. This effectively passes gradients only for positive input values, as ReLU is zero for negative inputs.
+
+        out._backward = _backward ## attach the _backward function to the out tensor. This allows the backward pass to be executed when backpropagation is performed on out.
+        return out  ## gives back the result of the ReLU operation as a new Tensor. This allows for chaining operations together, as the result can be used in further computations.    
+
+
+    def tanh(self): ## defines the hyperbolic tangent activation function for tensors. It allows for expressions like a.tanh(), where a is a Tensor.
+        out = Tensor(np.tanh(self.data), parents=(self,), op="tanh") ## does the forward pass of the tanh operation. It creates a new Tensor out that holds the result of applying the tanh function to self.data. It also sets the parent of out to be self, and labels the operation as "tanh".
+
+        def _backward(): ## it captures the results of self and out from the outer scope. It defines the backward pass for the tanh operation. This function will be called during backpropagation to compute the gradient of self with respect to out.
+            self.grad += (1 - out.data ** 2) * out.grad ## updates the gradient of self by adding the product of (1 - out.data ** 2) and out.grad. This is based on the derivative of the tanh function, which is 1 - tanh^2(x).
+
+        out._backward = _backward ## attach the _backward function to the out tensor. This allows the backward pass to be executed when backpropagation is performed on out.
+        return out  ## gives back the result of the tanh operation as a new Tensor. This allows for chaining operations together, as the result can be used in further computations.    
+
+
+    def sigmoid(self): ## defines the sigmoid activation function for tensors. It allows for expressions like a.sigmoid(), where a is a Tensor. 
+        out = Tensor(1 / (1 + np.exp(-self.data)), parents=(self,), op="sigmoid") ## does the forward pass of the sigmoid operation. It creates a new Tensor out that holds the result of applying the sigmoid function to self.data. It also sets the parent of out to be self, and labels the operation as "sigmoid".
+
+        def _backward(): ## it captures the results of self and out from the outer scope. It defines the backward pass for the sigmoid operation. This function will be called during backpropagation to compute the gradient of self with respect to out.
+            self.grad += (out.data * (1 - out.data)) * out.grad ## updates the gradient of self by adding the product of (out.data * (1 - out.data)) and out.grad. This is based on the derivative of the sigmoid function, which is sigmoid(x) * (1 - sigmoid(x)).
+
+        out._backward = _backward ## attach the _backward function to the out tensor. This allows the backward pass to be executed when backpropagation is performed on out.
+        return out  ## gives back the result of the sigmoid operation as a new Tensor. This allows for chaining operations together, as the result can be used in further computations. 
+
+    
