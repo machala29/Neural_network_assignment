@@ -1,5 +1,5 @@
 import numpy as np
-from nnlib.autograd import Tensor
+from nnlib.autograd import Tensor, cross_entropy
 
 
 def test_mul_and_add():
@@ -177,4 +177,49 @@ def test_exp_log():
     L.backward()
     assert np.isclose(a.grad, 1.0)  # The gradient of log(exp(a)) with respect to a is 1.0, since log(exp(a)) = a.
 
- 
+
+def test_values():
+    a = Tensor([1.0, 2.0, 3.0])
+    out = a.log_softmax(axis=0)
+    expected = np.log(np.exp(a.data) / np.sum(np.exp(a.data)))
+    assert np.allclose(out.data, expected)
+    out.backward()
+
+
+def test_cross_entropy_hand_check():
+    logits = Tensor([[2., 1.], [0.5, 1.5]])
+    targets = np.array([0, 1])                      # one class label per row
+    loss = cross_entropy(logits, targets)
+    assert np.isclose(loss.data, 0.31326, atol=1e-4)
+    loss.backward()
+    assert np.allclose(logits.grad, [[-0.13447, 0.13447], [0.13447, -0.13447]], atol=1e-4)
+    assert np.allclose(logits.grad.sum(axis=1), 0.0)
+
+
+def test_batch():
+    a = Tensor([[1., 2., 3.], [3., 2., 1.]])
+    out = a.log_softmax(axis=1)
+    assert np.allclose(out.data[0], [-2.4076, -1.4076, -0.4076], atol=1e-4)
+    assert np.allclose(out.data[1], [-0.4076, -1.4076, -2.4076], atol=1e-4)
+    assert np.allclose(np.exp(out.data).sum(axis=1), 1.0)   # each row of probabilities adds to 1
+    out.backward()                                          # ones start
+    assert np.allclose(a.grad[0], [0.7299, 0.2658, -0.9957], atol=1e-4)
+    assert np.allclose(a.grad.sum(axis=1), 0.0)             # gradient rows sum to zero
+
+
+def test_gradient():
+    a = Tensor([1., 2., 3.])
+    w = Tensor([1., 2., 3.])
+    L = (a.log_softmax(axis=0) * w).sum()
+    L.backward()
+    assert np.allclose(a.grad, [0.4598, 0.5316, -0.9914], atol=1e-4)
+    assert np.isclose(a.grad.sum(), 0.0)
+
+
+def test_stability():
+    a = Tensor([1000., 0.])
+    out = a.log_softmax(axis=0)
+    assert np.all(np.isfinite(out.data))                    # no nan or inf
+    assert np.allclose(out.data, [0.0, -1000.0])
+    out.backward()                                          # ones start, so grad = G - p*sum(G)
+    assert np.allclose(a.grad, [-1.0, 1.0])

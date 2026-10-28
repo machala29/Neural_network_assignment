@@ -241,4 +241,28 @@ class Tensor:  ## begins the definition of the Tensor class, which is a fundamen
         out._backward = _backward ## attach the _backward function to the out tensor. This allows the backward pass to be executed when backpropagation is performed on out.
         return out  ## gives back the result of the sigmoid operation as a new Tensor. This allows for chaining operations together, as the result can be used in further computations. 
 
+
+    def log_softmax(self, axis=-1): ## defines
+        m = self.data.max(axis=axis, keepdims=True) ## computes the maximum value along the specified axis, keeping the dimensions for broadcasting. This is used for numerical stability in the softmax computation.
+        shifted = self.data - m ## shifts the input data by subtracting the maximum value. This helps prevent overflow in the exponential calculations.
+        lse = np.log(np.sum(np.exp(shifted), axis=axis, keepdims=True)) ## computes the log-sum-exp (LSE) of the shifted data along the specified axis. This is a key step in calculating the log-softmax.  
+        out = Tensor(shifted - lse, parents=(self,), op="log_softmax") ## creates a new Tensor out that holds the result of the log-softmax operation. It sets the parent of out to be self and labels the operation as "log_softmax".
+
+        def _backward(): ## it captures the results of self and out from the outer scope. It defines the backward pass for the log-softmax operation. This function will be called during backpropagation to compute the gradient of self with respect to out.
+            p = np.exp(out.data) ## computes the softmax probabilities by exponentiating the log-softmax output. This is used to calculate the gradient of the log-softmax function.
+            self.grad += (out.grad - np.sum(out.grad, axis=axis, keepdims=True) * p) ## updates the gradient of self by adding the difference between out.grad and the sum of out.grad multiplied by the softmax probabilities. This is based on the derivative of the log-softmax function.
+
+        out._backward = _backward ## attach the _backward function to the out tensor. This allows the backward pass to be executed when backpropagation is performed on out.
+        return out  ## gives back the result of the log-softmax operation as a new Tensor. This allows for chaining operations together, as the result can be used in further computations.
     
+
+
+def cross_entropy(logits, targets):
+    N, C = logits.data.shape ## unpacks the shape of the logits tensor into N (number of samples) and C (number of classes).
+    one_hot_targets = np.zeros_like(logits.data) ## creates a one-hot encoded version of the targets tensor with the same shape as logits.data, initialized to zeros.
+    m = np.zeros((N, C)) ## creates a temporary matrix m of zeros with the same shape as logits.data. This will be used to construct the one-hot encoding of the targets.
+    labels = np.array(targets, dtype=int) ## converts the targets into a numpy array of integers. This ensures that the target labels are in the correct format for indexing.
+    m[np.arange(N), labels] = 1
+    logp = logits.log_softmax(axis=1) ## computes the log-softmax of the logits tensor along the class dimension (axis=1). This gives the log probabilities for each class.
+    return -(logp * Tensor(m)).sum(axis=1).mean() ## computes the cross-entropy loss by taking the negative sum of the product of the one-hot encoded targets and the log probabilities, averaging over all samples. This gives a scalar loss value that can be used for optimization.  
+
