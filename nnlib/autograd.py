@@ -266,3 +266,27 @@ def cross_entropy(logits, targets):
     logp = logits.log_softmax(axis=1) ## computes the log-softmax of the logits tensor along the class dimension (axis=1). This gives the log probabilities for each class.
     return -(logp * Tensor(m)).sum(axis=1).mean() ## computes the cross-entropy loss by taking the negative sum of the product of the one-hot encoded targets and the log probabilities, averaging over all samples. This gives a scalar loss value that can be used for optimization.  
 
+
+def grad_check(f, inputs, eps=1e-6):
+    for t in inputs:
+        t.grad = np.zeros_like(t.data)  # Reset gradients to zero before backward pass  
+    out = f(*inputs)
+    R = np.random.default_rng(0).standard_normal(out.data.shape)  # fixed random weight for reproducibility
+    L = (out * Tensor(R)).sum()  # Use the sum of the output for gradient checking
+    L.backward()  # Compute gradients using backpropagation
+    analytic = [t.grad.copy() for t in inputs]  # Store the analytic gradients
+    errors = []
+    for t, g_an in zip(inputs, analytic):
+        g_num = np.zeros_like(t.data)
+        for idx in np.ndindex(t.data.shape):
+            old = t.data[idx]
+            t.data[idx] = old + eps
+            plus = (f(*inputs).data * R).sum()
+            t.data[idx] = old - eps
+            minus = (f(*inputs).data * R).sum()
+            t.data[idx] = old  # Restore original value
+            g_num[idx] = (plus - minus) / (2 * eps)
+        error = np.linalg.norm(g_an - g_num) / max(np.linalg.norm(g_an) + np.linalg.norm(g_num), 1e-12)
+        errors.append(error)
+    return errors       
+

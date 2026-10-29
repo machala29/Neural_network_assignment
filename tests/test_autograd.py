@@ -1,5 +1,5 @@
 import numpy as np
-from nnlib.autograd import Tensor, cross_entropy
+from nnlib.autograd import Tensor, cross_entropy, grad_check
 
 
 def test_mul_and_add():
@@ -223,3 +223,21 @@ def test_stability():
     assert np.allclose(out.data, [0.0, -1000.0])
     out.backward()                                          # ones start, so grad = G - p*sum(G)
     assert np.allclose(a.grad, [-1.0, 1.0])
+
+
+def test_add_grad():
+    rng = np.random.default_rng(1)
+    a = Tensor(rng.standard_normal((3, 4)))
+    b = Tensor(rng.standard_normal((3, 4)))
+    errs = grad_check(lambda a, b: a + b, [a, b])
+    assert max(errs) < 1e-7
+
+
+def rt(shape, seed):
+    return Tensor(np.random.default_rng(seed).standard_normal(shape))
+
+def test_add_grad():
+    a = rt((3, 4), 1)
+    b = rt((3, 4), 2)
+    errs = grad_check(lambda a, b: a + b, [a, b])
+    assert max(errs) < 1e-7
