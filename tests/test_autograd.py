@@ -1,4 +1,5 @@
 import numpy as np
+import pytest   
 from nnlib.autograd import Tensor, cross_entropy, grad_check
 
 
@@ -233,11 +234,57 @@ def test_add_grad():
     assert max(errs) < 1e-7
 
 
-def rt(shape, seed):
-    return Tensor(np.random.default_rng(seed).standard_normal(shape))
+def rt(shape, seed, kind="normal"):
+    x = np.random.default_rng(seed).standard_normal(shape)
+    if kind == "positive":
+        x = np.abs(x) + 0.5
+    elif kind == "away":
+        x = np.where(np.abs(x) < 0.1, 0.5, x)
+    return Tensor(x)
+
+
 
 def test_add_grad():
     a = rt((3, 4), 1)
     b = rt((3, 4), 2)
     errs = grad_check(lambda a, b: a + b, [a, b])
+    assert max(errs) < 1e-7
+
+
+
+
+CASES = [
+    ("add",           lambda a, b: a + b,   [((3, 4), "normal"), ((3, 4), "normal")]),
+    ("add_bcast_row", lambda a, b: a + b,   [((3, 4), "normal"), ((1, 4), "normal")]),
+    ("log",           lambda a: a.log(),    [((3, 4), "positive")]),
+    ("cross_entropy", lambda l: cross_entropy(l, np.array([0, 3, 1, 4])), [((4, 5), "normal")]),
+    ("sub",           lambda a, b: a - b,   [((3, 4), "normal"), ((3, 4), "normal")]),
+    ("mul",           lambda a, b: a * b,   [((3, 4), "normal"), ((3, 4), "normal")]),
+    ("div",           lambda a, b: a / b,   [((3, 4), "normal"), ((3, 4), "positive")]),
+    ("pow",           lambda a: a ** 3,     [((3, 4), "normal")]),
+    ("exp",           lambda a: a.exp(),    [((3, 4), "normal")]),
+    ("relu",          lambda a: a.relu(),   [((3, 4), "away")]),
+    ("tanh",          lambda a: a.tanh(),   [((3, 4), "normal")]),
+    ("sigmoid",       lambda a: a.sigmoid(), [((3, 4), "normal")]),
+    ("neg",           lambda a: -a,          [((3, 4), "normal")]),
+    ("matmul",        lambda a, b: a @ b,    [((3, 4), "normal"), ((4, 5), "normal")]),
+    ("log_softmax",   lambda a: a.log_softmax(axis=1), [((3, 4), "normal")]),
+    ("sum",           lambda a: a.sum(axis=1), [((3, 4), "normal")]),
+    ("keepdims",       lambda a: a.sum(axis=1, keepdims=True), [((3, 4), "normal")]),
+    ("mean",           lambda a: a.mean(axis=1), [((3, 4), "normal")]),
+    ("reshape",        lambda a: a.reshape((4, 3)), [((3, 4), "normal")]),
+    ("T",              lambda a: a.T, [((3, 4), "normal")]),
+    ("add_bcast_vec",  lambda a, b: a + b, [((3, 4), "normal"), ((4,), "normal")]),
+    ("mul_bcast_col", lambda a, b: a * b, [((3, 4), "normal"), ((4,), "normal")]),
+    ("sum_axis0",      lambda a: a.sum(axis=0), [((3, 4), "normal")]),
+    ("sum_all",        lambda a: a.sum(), [((3, 4), "normal")]),
+    ("pow_half",       lambda a: a ** 0.5, [((3, 4), "positive")]),
+    ("pow_neg",        lambda a: a ** -1.0, [((3, 4), "positive")])    
+    ]
+
+@pytest.mark.parametrize("name, f, specs", CASES, ids=[c[0] for c in CASES])
+def test_grad_check(name, f, specs):
+    inputs = [rt(shape, i + 1, kind) for i, (shape, kind) in enumerate(specs)]
+    errs = grad_check(f, inputs)
+    print(name, max(errs))
     assert max(errs) < 1e-7
